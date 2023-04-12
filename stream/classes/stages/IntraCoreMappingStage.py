@@ -11,6 +11,9 @@ from zigzag.classes.stages.Stage import Stage
 from stream.classes.workload.computation_node import ComputationNode
 from zigzag.utils import pickle_deepcopy
 from zigzag.classes.mapping.mapping_assist_funcs import decouple_pr_loop
+from stream.visualization.node_hw_performances import (
+    visualize_node_hw_performances_pickle,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +153,8 @@ class IntraCoreMappingStage(Stage):
                     node.core_allocation = None  # Reset the node's core allocation
                     self.node_hw_performances[node][core] = cme
                     self.save_node_hw_performances()  # Save the hw performances dict after every node is finished
+        if "visualize_node_hw_performances" in self.kwargs and self.kwargs["visualize_node_hw_performances"]:
+            self.visualize_node_hw_performances()
         kwargs = self.kwargs.copy()
         kwargs["workload"] = self.workload
         kwargs["accelerator"] = self.accelerator
@@ -174,6 +179,17 @@ class IntraCoreMappingStage(Stage):
             logger.debug(
                 f'Saved unique CN node HW performance to {self.kwargs["node_hw_performances_path"]}.'
             )
+
+    def visualize_node_hw_performances(self):
+        # Get the scale factors
+        scale_factors = {
+            n.id: len(list(cn for cn in self.workload if cn == n))
+            for n in self.node_hw_performances
+        }
+        # Run the visualization
+        visualize_node_hw_performances_pickle(
+            self.kwargs["node_hw_performances_path"], scale_factors
+        )
 
     def get_intra_core_mapping_flow(self, node, too_large_operands, core_id):
         logger.info(f"Launching intra-core mapping optimization for {node}...")
