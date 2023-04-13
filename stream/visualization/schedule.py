@@ -18,6 +18,20 @@ def plot_timeline_brokenaxes(
     plot_data_transfer: object = False,
     fig_path: object = "outputs/schedule_plot.png",
 ) -> object:
+    # MPL FONT SIZES
+    SMALLER_SIZE = 12
+    SMALL_SIZE = 14
+    MEDIUM_SIZE = 16
+    BIG_SIZE = 18
+    BIGGER_SIZE = 20
+    plt.rc("font", size=SMALL_SIZE)  # controls default text sizes
+    plt.rc("axes", titlesize=SMALL_SIZE)  # fontsize of the axes title
+    plt.rc("axes", labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+    plt.rc("xtick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
+    plt.rc("ytick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
+    plt.rc("legend", fontsize=SMALLER_SIZE)  # legend fontsize
+    plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
     logger.info("Plotting...")
 
     G: DiGraph = scme.workload

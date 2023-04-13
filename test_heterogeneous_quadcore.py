@@ -23,7 +23,7 @@ mapping_path = "stream.inputs.date2023.mapping.mapping"
 CN_define_mode = 1  # manually define outer CN size for all cores and all layers
 hint_loops = [("OY", "all")]  # outer CN loops, with error in resnet18 plotting
 
-hw_name = accelerator.split(".")[-1]
+hw_name = accelerator.split(".")[-1] + "_new_memory"
 wl_name = re.split(r"/|\.", workload_path)[-1]
 if wl_name == "onnx":
     wl_name = re.split(r"/|\.", workload_path)[-2]
@@ -53,7 +53,7 @@ mainstage = MainStage(
     mapping_path=mapping_path,  # required by ModelParserStage
     loma_lpf_limit=6,  # required by LomaStage
     nb_ga_individuals=16,  # number of individuals in each genetic algorithm generation
-    nb_ga_generations=32,  # number of genetic algorithm generations
+    nb_ga_generations=16,  # number of genetic algorithm generations
     node_hw_performances_path=f"outputs/{node_hw_cost_pkl_name}.pickle",  # saved node_hw_performances to skip re-computation
     plot_hof=True,  # Save schedule and memory usage plot of each individual in the Genetic Algorithm hall of fame
     plot_file_name=plot_file_name,
@@ -75,8 +75,8 @@ draw_dependencies = True
 plot_data_transfer = True
 section_start_percent = (0,)
 percent_shown = (100,)
-timeline_fig_path = "outputs/schedule_plot.png"
-memory_fig_path = "outputs/memory_plot.png"
+timeline_fig_path = f"outputs/schedule_{experiment_id}.png"
+memory_fig_path = f"outputs/memory_{experiment_id}.png"
 
 plot_timeline_brokenaxes(
     scme,

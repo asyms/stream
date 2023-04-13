@@ -80,25 +80,31 @@ def visualize_node_hw_performances_pickle(
     node_labels = []
     cores = []
     min_latency_per_node = {}
+    min_energy_per_node = {}
     for node, hw_performances in node_hw_performances.items():
         node_labels.append(f"L{node.id[0]}\nN{node.id[1]}")
         min_latency_per_node[node] = float("inf")
+        min_energy_per_node[node] = float("inf")
         print(node, scale_factors[node])
         for core, cme in hw_performances.items():
             if core not in cores:
                 cores.append(core)
             if cme.latency_total2 < min_latency_per_node[node]:
                 min_latency_per_node[node] = cme.latency_total2
+                min_energy_per_node[node] = cme.energy_total
         print(
             node.type,
             node.id,
             {k: cme.latency_total2 for k, cme in hw_performances.items()},
         )
-    # Multiply the min_latency_per_node with the scale factor
+    # Multiply the min_latency_per_node and min_energy_per_node with the scale factor
     for node in min_latency_per_node:
         min_latency_per_node[node] *= scale_factors[node]
+        min_energy_per_node[node] *= scale_factors[node]
     # Sum the latencies (assumes no overlap)
     worst_case_latency = sum(min_latency_per_node.values())
+    # Sum the energies (assumes every node is mapped to most energy-efficient core)
+    best_case_energy = sum(min_energy_per_node.values())
 
     # COLORMAP
     colormap = plt.get_cmap("Set1")
@@ -111,29 +117,42 @@ def visualize_node_hw_performances_pickle(
         for i in range(len(cores))
     ]
 
-    fig, ax = plt.subplots(1, 1, figsize=(20, 5))
+    fig, axs = plt.subplots(2, 1, figsize=(20, 10), sharex=True)
     for core, offset in zip(cores, offsets):
         core_latencies = []
+        core_energies = []
         for node, hw_performances in node_hw_performances.items():
             if core in hw_performances:
                 core_latencies.append(
                     scale_factors[node] * hw_performances[core].latency_total2
                 )
+                core_energies.append(
+                    scale_factors[node] * hw_performances[core].energy_total
+                )
             else:
                 core_latencies.append(0)
-        rects = ax.bar(
-            x + offset, core_latencies, width, label=f"{core}", color=colors[core]
-        )
-    ax.set_xticks(x)
-    # ax.set_xticklabels(node_labels)
-    ax.set_yscale("log")
-    ax.yaxis.grid(which="major", linestyle="-", linewidth=0.5, color="black")
-    ax.yaxis.grid(which="minor", linestyle=":", linewidth=0.25, color=(0.2, 0.2, 0.2))
-    ax.legend()
-    plt.title(
-        f"Worst-case latency = {worst_case_latency:.3e} Cycles",
+                core_energies.append(0)
+        for ax, y_values in zip(axs, [core_latencies, core_energies]):
+            rects = ax.bar(
+                x + offset, y_values, width, label=f"{core}", color=colors[core]
+            )
+    for ax in axs:
+        ax.set_xticks(x)
+        ax.set_xticklabels(node_labels)
+        ax.set_yscale("log")
+        ax.yaxis.grid(which="major", linestyle="-", linewidth=0.5, color="black")
+        ax.yaxis.grid(which="minor", linestyle=":", linewidth=0.25, color=(0.2, 0.2, 0.2))
+    axs[0].legend(loc='upper left', bbox_to_anchor=(0.0, 1.15), ncol=len(cores))
+    axs[0].set_title(
+        f"Worst (no overlap) best-case latency = {worst_case_latency:.3e} Cycles",
         loc="right",
     )
+    axs[0].set_ylabel("Latency [cycles]")
+    axs[1].set_title(
+        f"Best-case energy = {best_case_energy:.3e} pJ",
+        loc="right",
+    )
+    axs[1].set_ylabel("Energy [pJ]")
     fig.tight_layout()
     plt.savefig(fig_path, bbox_inches="tight")
     print(f"Saved node_hw_performances visualization to: {fig_path}")

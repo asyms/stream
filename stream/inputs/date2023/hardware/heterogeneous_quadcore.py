@@ -31,7 +31,7 @@ simd_core = get_simd_core(id=5)
 offchip_core_id = 6
 offchip_core = get_offchip_core(id=offchip_core_id)
 
-cores_graph = get_2d_mesh(cores, 2, 2, 64, 0, pooling_core, simd_core, offchip_core)
+cores_graph = get_2d_mesh(cores, 2, 2, core_def.inter_core_bandwidth, 0, pooling_core, simd_core, offchip_core)
 
 global_buffer = None
 accelerator = Accelerator(

@@ -59,33 +59,13 @@ width_rf_outputs = size_rf_outputs * 8
 #
 size_offchip = 1073741824  # in bytes
 width_offchip = 64
-# from zigzag.classes.hardware.architecture.memory_instance import MemoryInstance
-
-# off_chip_memory = MemoryInstance(
-#     name="dram",
-#     mem_type="dram",
-#     size=1073741824 * 8,
-#     r_bw=64,
-#     r_port=0,
-#     w_port=0,
-#     rw_port=1,
-#     latency=1,
-#     auto_cost_extraction=True,
-# )
-
-# read_costs_off_chip = off_chip_memory.r_cost
-# size_off_chip = off_chip_memory.size
-# width_off_chip = off_chip_memory.r_bw
-
-# read_write_costs_on_chip = None
-# read_write_bw_on_chip = None
 #
 ###############################################################################################
 #
 # The core of the quadcore example can communicate over a bus.
 #
 # This bus has the following bandwidth:
-width_inter_core_bus = 128
+inter_core_bandwidth = 64
 #
 ###############################################################################################
 #
