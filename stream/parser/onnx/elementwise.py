@@ -7,26 +7,26 @@ class ElementwiseParser(OnnxOperatorParser):
     For example, an Add operator adds two tensors together in every position into one output tensor.
     """
 
-    def __init__(self, node_id, node, nodes_outputs, mapping, onnx_model) -> None:
-        raise NotImplementedError
-        super().__init__(node_id, node, nodes_outputs, mapping, onnx_model)
+    def __init__(self, node_id, node, nodes_outputs, onnx_model) -> None:
+        super().__init__(node_id, node, nodes_outputs, onnx_model)
         self.type = node.op_type.lower()
         self.name = node.name
 
-    def generate_node(self):
-        # Get the predecessors of this node
-        predecessors = []
-        for node_input in self.node.input:
-            for n in self.nodes_outputs:
-                if node_input in self.nodes_outputs[n]:
-                    predecessors.append(n)
+    def run(self):
+        return self.generate_elementwise_node()
 
-        # Get the names of the two inputs
-        assert len(self.node.input) == 2, f"Elementwise node has more than two inputs: {self.node.input}"
-        # Get the output name
+    def generate_elementwise_node(self):
+        predecessors = self.get_node_predecessors()
+        assert 0 < len(predecessors) <= 2, f"An ONNX Elementwise node of type {self.type} with {len(predecessors)} input nodes is not supported"
+        input_names = self.node.input[:len(predecessors)]
+        output_names = [self.node.output[0]]
+
+
         node_obj = ElementwiseNode(
             node_id=self.node_id,
-            node_name=self.name,
-            predecessor=predecessors,
+            node_name=self.node.name,
+            predecessors=predecessors,
+            input_names=input_names,
+            output_names=output_names,
         )
         return node_obj
