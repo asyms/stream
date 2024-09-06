@@ -4,14 +4,16 @@ import re
 
 from zigzag.stages.MainStage import MainStage
 
-from stream.classes.stages.AcceleratorParserStage import (
+from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
+from stream.stages.estimation.zigzag_core_mapping_estimation import ZigZagCoreMappingEstimationStage
+from stream.stages.generation.hint_loops_partitioned_workload_generation import (
+    HintLoopsPartitionedWorkloadGenerationStage,
+)
+from stream.stages.generation.scheduling_order_generation import SchedulingOrderGenerationStage
+from stream.stages.parsing.accelerator_parser import (
     AcceleratorParserStage as AcceleratorParserStage_,
 )
-from stream.classes.stages.DetermineSchedulingOrderStage import DetermineSchedulingOrderStage
-from stream.classes.stages.GenerateCNWorkloadHybridStage import GenerateCNWorkloadHybridStage
-from stream.classes.stages.InterCoreMappingStage import InterCoreMappingStage
-from stream.classes.stages.IntraCoreMappingStage import IntraCoreMappingStage
-from stream.classes.stages.ModelParserStage import ONNXModelParserStage as StreamONNXModelParserStage
+from stream.stages.parsing.onnx_model_parser import ONNXModelParserStage as StreamONNXModelParserStage
 from stream.visualization.memory_usage import plot_memory_usage
 from stream.visualization.schedule import (
     plot_timeline_brokenaxes,
@@ -24,17 +26,17 @@ _logging.basicConfig(level=_logging_level, format=_logging_format)
 
 ################################INPUTS################################
 accelerator = "stream/inputs/eenn/hardware/edge_tpu_like_quad_core.yaml"
-workload_path = "stream/inputs/eenn/workload/conv-only.onnx"
+workload_path = "stream/inputs/eenn/workload/maxpool-conv.onnx"
 mapping_path = "stream/inputs/eenn/mapping/edge_tpu_like_quad_core.yaml"
 CN_define_mode = 1  # manually define outer-CN loops
 # hint_loops = [("OY", "all")]
 hint_loops = []
-nb_ga_individuals = 4  # number of individuals in each generation
-nb_ga_generations = 4  # number of genetic algorithm generations
+nb_ga_individuals = 16  # number of individuals in each generation
+nb_ga_generations = 16  # number of genetic algorithm generations
 ######################################################################
 
 ################################PARSING###############################
-hw_name = accelerator.split(".")[-1]
+hw_name = accelerator.split("/")[-1].split(".")[0]
 wl_name = re.split(r"/|\.", workload_path)[-1]
 if wl_name == "onnx":
     wl_name = re.split(r"/|\.", workload_path)[-2]
@@ -71,10 +73,10 @@ mainstage = MainStage(
         AcceleratorParserStage_,  # Parses the accelerator
         StreamONNXModelParserStage,  # Parses the ONNX Model into the workload
         # UserDefinedModelParserStage,  # Parses the user-defined Model into the workload
-        GenerateCNWorkloadHybridStage,
-        IntraCoreMappingStage,
-        DetermineSchedulingOrderStage,
-        InterCoreMappingStage,
+        HintLoopsPartitionedWorkloadGenerationStage,
+        ZigZagCoreMappingEstimationStage,
+        SchedulingOrderGenerationStage,
+        GeneticAlgorithmAllocationStage,
     ],
     accelerator=accelerator,  # required by AcceleratorParserStage
     workload_path=workload_path,  # required by ModelParserStage
