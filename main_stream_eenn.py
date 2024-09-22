@@ -2,7 +2,7 @@ import logging as _logging
 import pickle
 import re
 
-from zigzag.stages.MainStage import MainStage
+from zigzag.stages.main import MainStage
 
 from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
 from stream.stages.estimation.zigzag_core_mapping_estimation import ZigZagCoreMappingEstimationStage
@@ -44,7 +44,7 @@ hint_loops_str_list = []
 for dim, size in hint_loops:
     hint_loops_str_list.extend([str(dim).lower(), str(size)])
 hint_loops_str = "_".join(hint_loops_str_list)
-experiment_id = f"{hw_name}-{wl_name}-hintloop_{hint_loops_str}"
+experiment_id = f"eenn-{hw_name}-{wl_name}-hintloop_{hint_loops_str}"
 node_hw_cost_pkl_name = f"{experiment_id}-saved_cn_hw_cost"
 scme_pkl_name = f"{experiment_id}-scme"
 ######################################################################
