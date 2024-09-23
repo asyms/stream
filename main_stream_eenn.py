@@ -6,14 +6,17 @@ from zigzag.stages.main import MainStage
 
 from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
 from stream.stages.estimation.zigzag_core_mapping_estimation import ZigZagCoreMappingEstimationStage
+from stream.stages.generation.hint_loops_generation import HintLoopsGenerationStage
 from stream.stages.generation.hint_loops_partitioned_workload_generation import (
     HintLoopsPartitionedWorkloadGenerationStage,
 )
+from stream.stages.generation.layer_stacks_generation import LayerStacksGenerationStage
 from stream.stages.generation.scheduling_order_generation import SchedulingOrderGenerationStage
 from stream.stages.parsing.accelerator_parser import (
     AcceleratorParserStage as AcceleratorParserStage_,
 )
 from stream.stages.parsing.onnx_model_parser import ONNXModelParserStage as StreamONNXModelParserStage
+from stream.stages.set_fixed_allocation_performance import SetFixedAllocationPerformanceStage
 from stream.visualization.memory_usage import plot_memory_usage
 from stream.visualization.schedule import (
     plot_timeline_brokenaxes,
@@ -26,13 +29,14 @@ _logging.basicConfig(level=_logging_level, format=_logging_format)
 
 ################################INPUTS################################
 accelerator = "stream/inputs/eenn/hardware/edge_tpu_like_quad_core.yaml"
-workload_path = "stream/inputs/eenn/workload/maxpool-conv.onnx"
+workload_path = "stream/inputs/eenn/workload/conv-only.onnx"
 mapping_path = "stream/inputs/eenn/mapping/edge_tpu_like_quad_core.yaml"
 CN_define_mode = 1  # manually define outer-CN loops
 # hint_loops = [("OY", "all")]
 hint_loops = []
 nb_ga_individuals = 16  # number of individuals in each generation
 nb_ga_generations = 16  # number of genetic algorithm generations
+mode = "lbl"
 ######################################################################
 
 ################################PARSING###############################
@@ -60,11 +64,11 @@ percent_shown = (100,)
 
 
 ################################PATHS################################
-node_hw_performances_path = f"outputs/{node_hw_cost_pkl_name}.pickle"
-scme_path = f"outputs/{scme_pkl_name}.pickle"
-timeline_fig_path_plotly = f"outputs/{experiment_id}-schedule.html"
-timeline_fig_path_matplotlib = f"outputs/{experiment_id}-schedule.png"
-memory_fig_path = f"outputs/{experiment_id}-memory.png"
+node_hw_performances_path = f"outputs-eenn/{node_hw_cost_pkl_name}.pickle"
+scme_path = f"outputs-eenn/{scme_pkl_name}.pickle"
+timeline_fig_path_plotly = f"outputs-eenn/{experiment_id}-schedule.html"
+timeline_fig_path_matplotlib = f"outputs-eenn/{experiment_id}-schedule.png"
+memory_fig_path = f"outputs-eenn/{experiment_id}-memory.png"
 #####################################################################
 
 
@@ -72,9 +76,11 @@ mainstage = MainStage(
     [  # Initializes the MainStage as entry point
         AcceleratorParserStage_,  # Parses the accelerator
         StreamONNXModelParserStage,  # Parses the ONNX Model into the workload
-        # UserDefinedModelParserStage,  # Parses the user-defined Model into the workload
+        LayerStacksGenerationStage,
+        HintLoopsGenerationStage,
         HintLoopsPartitionedWorkloadGenerationStage,
         ZigZagCoreMappingEstimationStage,
+        SetFixedAllocationPerformanceStage,
         SchedulingOrderGenerationStage,
         GeneticAlgorithmAllocationStage,
     ],
@@ -93,6 +99,7 @@ mainstage = MainStage(
     hint_loops=hint_loops,
     scheduler_candidate_selection="memory",
     operands_to_prefetch=[],
+    mode=mode,
 )
 
 # Launch the MainStage
