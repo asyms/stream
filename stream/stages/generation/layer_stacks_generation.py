@@ -77,7 +77,8 @@ class LayerStacksGenerationStage(Stage):
                 n = next(n for n in self.workload.node_list if n.id == layer_id)
                 if isinstance(n, ComputationNode):
                     update_stack.append(layer_id)
-            updated_layer_stacks.append(tuple(update_stack))
+            if update_stack:
+                updated_layer_stacks.append(tuple(update_stack))
         self.layer_stacks = updated_layer_stacks
 
     def get_layer_stacks_lbl(self):

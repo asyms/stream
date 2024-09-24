@@ -8,6 +8,10 @@ from stream.utils import CostModelEvaluationLUT, get_too_large_operands
 from stream.workload.computation_node import ComputationNode
 from stream.workload.onnx_workload import ComputationNodeWorkload
 
+EENN_BLOCK_IDS = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (9, 10, 11)]
+EENN_CLASSIFIER_IDS = [(0,), (1,), (2,), (3,)]
+STAGE_IDS = [0, 1, 2, 3]
+
 
 class FitnessEvaluator:
     def __init__(
@@ -46,6 +50,8 @@ class StandardFitnessEvaluator(FitnessEvaluator):
         self.operands_to_prefetch = operands_to_prefetch
         self.scheduling_order = scheduling_order
 
+        self.data = []
+
     def get_fitness(self, core_allocations: list[int], return_scme: bool = False):
         """Get the fitness of the given core_allocations
 
@@ -63,8 +69,72 @@ class StandardFitnessEvaluator(FitnessEvaluator):
         energy = scme.energy
         latency = scme.latency
         if not return_scme:
+            self.save_eenn_data(scme)
             return energy, latency
+        self.plot_eenn_data(scme)
         return energy, latency, scme
+
+    def save_eenn_data(self, scme: StreamCostModelEvaluation):
+        """! Save the latency and energy overhead of each eenn stage for this allocation."""
+        all_block_nodes = {}
+        all_classifier_nodes = {}
+        all_block_starts = {}
+        all_block_ends = {}
+        all_classifier_starts = {}
+        all_classifier_ends = {}
+        for stage_id in STAGE_IDS:
+            block_ids = EENN_BLOCK_IDS[stage_id]
+            classifier_ids = EENN_CLASSIFIER_IDS[stage_id]
+            block_nodes = []
+            block_patterns = {f"blocks.{x}/" for x in block_ids}
+            classifier_patterns = {f"classifiers.{x}/" for x in classifier_ids}
+            block_nodes = [n for n in scme.workload.node_list if any((p in n.name for p in block_patterns))]
+            classifier_nodes = [n for n in scme.workload.node_list if any((p in n.name for p in classifier_patterns))]
+            all_block_nodes[stage_id] = block_nodes
+            all_classifier_nodes[stage_id] = classifier_nodes
+
+            block_start = min((n.start for n in block_nodes))
+            classifier_start = min((n.start for n in classifier_nodes))
+            block_end = max((n.end for n in block_nodes))
+            classifier_end = max((n.end for n in classifier_nodes))
+            all_block_starts[stage_id] = block_start
+            all_block_ends[stage_id] = block_end
+            all_classifier_starts[stage_id] = classifier_start
+            all_classifier_ends[stage_id] = classifier_end
+            assert classifier_end >= block_end, "Classifier end should be after block end"
+            assert classifier_start >= block_start, "Classifier start should be after block start"
+
+        for stage_id in STAGE_IDS:
+            block_latency = all_block_ends[stage_id] - all_block_starts[stage_id]
+            classifier_latency = all_classifier_ends[stage_id] - all_classifier_starts[stage_id]
+            latency = all_classifier_ends[stage_id] - all_block_starts[stage_id]
+            energy = sum(
+                (n.onchip_energy + n.offchip_energy for n in all_block_nodes[stage_id] + all_classifier_nodes[stage_id])
+            )
+            if stage_id != STAGE_IDS[-1]:
+                next_block_nodes = all_block_nodes[stage_id + 1]
+                overlapping_next_block_nodes = [n for n in next_block_nodes if n.start < all_classifier_ends[stage_id]]
+                energy_overhead = sum((n.onchip_energy + n.offchip_energy for n in overlapping_next_block_nodes))
+            else:
+                energy_overhead = 0
+            stage_data = {
+                "stage_id": stage_id,
+                "block_latency": block_latency,
+                "classifier_latency": classifier_latency,
+                "latency": latency,
+                "energy": energy,
+                "energy_overhead": energy_overhead,
+            }
+            self.data.append(stage_data)
+
+    def plot_eenn_data(self, best_scme):
+        total_energy = best_scme.energy
+        total_latency = best_scme.latency
+        from pprint import pprint
+
+        for d in self.data:
+            pprint(d)
+        pprint({"total_energy": total_energy, "total_latency": total_latency})
 
     def set_node_core_allocations(self, core_allocations: list[int]):
         """Sets the core allocation of all nodes in self.workload according to core_allocations.
