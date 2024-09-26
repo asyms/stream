@@ -1,25 +1,9 @@
 import logging as _logging
-import pickle
 import re
 
-from zigzag.stages.main import MainStage
-
-from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
-from stream.stages.estimation.zigzag_core_mapping_estimation import ZigZagCoreMappingEstimationStage
-from stream.stages.generation.hint_loops_generation import HintLoopsGenerationStage
-from stream.stages.generation.hint_loops_partitioned_workload_generation import (
-    HintLoopsPartitionedWorkloadGenerationStage,
-)
-from stream.stages.generation.layer_stacks_generation import LayerStacksGenerationStage
-from stream.stages.generation.scheduling_order_generation import SchedulingOrderGenerationStage
-from stream.stages.parsing.accelerator_parser import (
-    AcceleratorParserStage as AcceleratorParserStage_,
-)
-from stream.stages.parsing.onnx_model_parser import ONNXModelParserStage as StreamONNXModelParserStage
-from stream.stages.set_fixed_allocation_performance import SetFixedAllocationPerformanceStage
+from stream.api import optimize_allocation_ga
 from stream.visualization.memory_usage import plot_memory_usage
 from stream.visualization.schedule import (
-    plot_timeline_brokenaxes,
     visualize_timeline_plotly,
 )
 
@@ -27,105 +11,58 @@ _logging_level = _logging.INFO
 _logging_format = "%(asctime)s - %(name)s.%(funcName)s +%(lineno)s - %(levelname)s - %(message)s"
 _logging.basicConfig(level=_logging_level, format=_logging_format)
 
-################################INPUTS################################
+############################################INPUTS############################################
 accelerator = "stream/inputs/eenn/hardware/edge_tpu_like_quad_core.yaml"
 workload_path = "stream/inputs/eenn/workload/conv-only.onnx"
 mapping_path = "stream/inputs/eenn/mapping/edge_tpu_like_quad_core.yaml"
-CN_define_mode = 1  # manually define outer-CN loops
-# hint_loops = [("OY", "all")]
-hint_loops = []
-nb_ga_individuals = 16  # number of individuals in each generation
-nb_ga_generations = 16  # number of genetic algorithm generations
 mode = "lbl"
-######################################################################
+nb_ga_generations = 16
+nb_ga_individuals = 16
+layer_stacks = list((i,) for i in range(120))
+##############################################################################################
 
 ################################PARSING###############################
 hw_name = accelerator.split("/")[-1].split(".")[0]
 wl_name = re.split(r"/|\.", workload_path)[-1]
 if wl_name == "onnx":
     wl_name = re.split(r"/|\.", workload_path)[-2]
-hint_loops_str_list = []
-for dim, size in hint_loops:
-    hint_loops_str_list.extend([str(dim).lower(), str(size)])
-hint_loops_str = "_".join(hint_loops_str_list)
-experiment_id = f"eenn-{hw_name}-{wl_name}-hintloop_{hint_loops_str}"
-node_hw_cost_pkl_name = f"{experiment_id}-saved_cn_hw_cost"
-scme_pkl_name = f"{experiment_id}-scme"
+experiment_id = f"eenn-{hw_name}-{wl_name}-{mode}"
 ######################################################################
 
-############PLOTTING#############
+##############PLOTTING###############
 plot_file_name = f"-{experiment_id}-"
 plot_full_schedule = True
 draw_dependencies = True
 plot_data_transfer = True
 section_start_percent = (0,)
 percent_shown = (100,)
-#################################
+#####################################
 
 
 ################################PATHS################################
-node_hw_performances_path = f"outputs-eenn/{node_hw_cost_pkl_name}.pickle"
-scme_path = f"outputs-eenn/{scme_pkl_name}.pickle"
 timeline_fig_path_plotly = f"outputs-eenn/{experiment_id}-schedule.html"
-timeline_fig_path_matplotlib = f"outputs-eenn/{experiment_id}-schedule.png"
 memory_fig_path = f"outputs-eenn/{experiment_id}-memory.png"
 #####################################################################
 
-
-mainstage = MainStage(
-    [  # Initializes the MainStage as entry point
-        AcceleratorParserStage_,  # Parses the accelerator
-        StreamONNXModelParserStage,  # Parses the ONNX Model into the workload
-        LayerStacksGenerationStage,
-        HintLoopsGenerationStage,
-        HintLoopsPartitionedWorkloadGenerationStage,
-        ZigZagCoreMappingEstimationStage,
-        SetFixedAllocationPerformanceStage,
-        SchedulingOrderGenerationStage,
-        GeneticAlgorithmAllocationStage,
-    ],
-    accelerator=accelerator,  # required by AcceleratorParserStage
-    workload_path=workload_path,  # required by ModelParserStage
-    mapping_path=mapping_path,  # required by ModelParserStage
-    loma_lpf_limit=6,  # required by LomaEngine
-    nb_ga_individuals=nb_ga_individuals,  # number of individuals in each genetic algorithm generation
-    nb_ga_generations=nb_ga_generations,  # number of genetic algorithm generations
-    node_hw_performances_path=node_hw_performances_path,  # saved node_hw_performances to skip re-computation
-    plot_hof=True,  # Save schedule and memory usage plot of each individual in the Genetic Algorithm hall of fame
-    plot_file_name=plot_file_name,
-    plot_full_schedule=plot_full_schedule,
-    plot_data_transfer=plot_data_transfer,
-    cn_define_mode=CN_define_mode,
-    hint_loops=hint_loops,
-    scheduler_candidate_selection="memory",
-    operands_to_prefetch=[],
+scme = optimize_allocation_ga(
+    hardware=accelerator,
+    workload=workload_path,
+    mapping=mapping_path,
     mode=mode,
+    layer_stacks=layer_stacks,
+    nb_ga_generations=nb_ga_generations,
+    nb_ga_individuals=nb_ga_individuals,
+    experiment_id=experiment_id,
+    output_path="outputs-eenn",
+    skip_if_exists=False,
 )
 
-# Launch the MainStage
-
-scme, _ = mainstage.run()
-scme = scme[0]
-
-# Save the scme to a pickle file
-with open(scme_path, "wb") as fp:
-    pickle.dump(scme, fp)
-
-# Plotting results using Plotly
+# Plotting schedule timeline of best SCME
 visualize_timeline_plotly(
     scme,
     draw_dependencies=draw_dependencies,
     draw_communication=plot_data_transfer,
     fig_path=timeline_fig_path_plotly,
 )
-
-# Ploting results using Matplotlib
-plot_timeline_brokenaxes(
-    scme,
-    draw_dependencies,
-    section_start_percent,
-    percent_shown,
-    plot_data_transfer,
-    fig_path=timeline_fig_path_matplotlib,
-)
+# Plotting memory usage of best SCME
 plot_memory_usage(scme, section_start_percent, percent_shown, fig_path=memory_fig_path)

@@ -20,7 +20,6 @@ from stream.parser.onnx.reshape import ReshapeParser
 from stream.parser.onnx.simd import SimdParser
 from stream.parser.onnx.softmax import SoftmaxParser
 from stream.parser.onnx.transpose import TransposeParser
-from stream.parser.onnx.elementwise import ElementwiseParser
 from stream.workload.onnx_workload import ONNXWorkload
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,6 @@
 from zigzag.datatypes import LayerOperand
 from zigzag.mapping.data_movement import MemoryAccesses
-from zigzag.utils import pickle_deepcopy
+from zigzag.utils import pickle_deepcopy, pickle_save
 
 from stream.cost_model.cost_model import StreamCostModelEvaluation
 from stream.hardware.architecture.accelerator import Accelerator
@@ -11,6 +11,7 @@ from stream.workload.onnx_workload import ComputationNodeWorkload
 EENN_BLOCK_IDS = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (9, 10, 11)]
 EENN_CLASSIFIER_IDS = [(0,), (1,), (2,), (3,)]
 STAGE_IDS = [0, 1, 2, 3]
+DATA_PATH = "outputs-eenn/eenn_data.pickle"
 
 
 class FitnessEvaluator:
@@ -71,7 +72,7 @@ class StandardFitnessEvaluator(FitnessEvaluator):
         if not return_scme:
             self.save_eenn_data(scme)
             return energy, latency
-        self.plot_eenn_data(scme)
+        self.write_eenn_data()
         return energy, latency, scme
 
     def save_eenn_data(self, scme: StreamCostModelEvaluation):
@@ -88,6 +89,8 @@ class StandardFitnessEvaluator(FitnessEvaluator):
             block_nodes = []
             block_patterns = {f"blocks.{x}/" for x in block_ids}
             classifier_patterns = {f"classifiers.{x}/" for x in classifier_ids}
+            if stage_id == 0:
+                block_patterns.add("/first_conv/conv/Conv")
             block_nodes = [n for n in scme.workload.node_list if any((p in n.name for p in block_patterns))]
             classifier_nodes = [n for n in scme.workload.node_list if any((p in n.name for p in classifier_patterns))]
             all_block_nodes[stage_id] = block_nodes
@@ -104,37 +107,53 @@ class StandardFitnessEvaluator(FitnessEvaluator):
             assert classifier_end >= block_end, "Classifier end should be after block end"
             assert classifier_start >= block_start, "Classifier start should be after block start"
 
+        cum_energy = 0
+        cum_macs = 0
+        total_macs = sum((n.total_mac_count for n in scme.workload.node_list))
         for stage_id in STAGE_IDS:
+            stage_start = all_block_starts[stage_id]
+            stage_end = all_classifier_ends[stage_id]
             block_latency = all_block_ends[stage_id] - all_block_starts[stage_id]
             classifier_latency = all_classifier_ends[stage_id] - all_classifier_starts[stage_id]
-            latency = all_classifier_ends[stage_id] - all_block_starts[stage_id]
-            energy = sum(
+            latency = stage_end - stage_start
+            # CN energy
+            cn_energy = sum(
                 (n.onchip_energy + n.offchip_energy for n in all_block_nodes[stage_id] + all_classifier_nodes[stage_id])
             )
+            cum_energy += cn_energy
+            # Communication energy
+            pass
+            comm_energy = 0
+            for event in scme.accelerator.communication_manager.events:
+                if event.tasks[0].tensors[0].origin in all_block_nodes[stage_id] + all_classifier_nodes[stage_id]:
+                    comm_energy += event.energy + event.memory_energy
+            cum_energy += comm_energy
             if stage_id != STAGE_IDS[-1]:
                 next_block_nodes = all_block_nodes[stage_id + 1]
                 overlapping_next_block_nodes = [n for n in next_block_nodes if n.start < all_classifier_ends[stage_id]]
                 energy_overhead = sum((n.onchip_energy + n.offchip_energy for n in overlapping_next_block_nodes))
             else:
                 energy_overhead = 0
+            # macs on this stage
+            macs = sum((n.total_mac_count for n in all_block_nodes[stage_id] + all_classifier_nodes[stage_id]))
+            cum_macs += macs
             stage_data = {
-                "stage_id": stage_id,
+                "stage_id": stage_id + 1,
                 "block_latency": block_latency,
                 "classifier_latency": classifier_latency,
                 "latency": latency,
-                "energy": energy,
+                "cn_energy": cn_energy,
+                "comm_energy": comm_energy,
                 "energy_overhead": energy_overhead,
+                "cum_latency_fraction": all_classifier_ends[stage_id] / scme.latency,
+                "energy_fraction": (cn_energy + comm_energy) / scme.energy,
+                "cum_energy_fraction": cum_energy / scme.energy,
+                "cum_macs_fraction": cum_macs / total_macs,
             }
             self.data.append(stage_data)
 
-    def plot_eenn_data(self, best_scme):
-        total_energy = best_scme.energy
-        total_latency = best_scme.latency
-        from pprint import pprint
-
-        for d in self.data:
-            pprint(d)
-        pprint({"total_energy": total_energy, "total_latency": total_latency})
+    def write_eenn_data(self):
+        pickle_save(self.data, DATA_PATH)
 
     def set_node_core_allocations(self, core_allocations: list[int]):
         """Sets the core allocation of all nodes in self.workload according to core_allocations.

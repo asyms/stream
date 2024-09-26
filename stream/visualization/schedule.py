@@ -463,7 +463,8 @@ def get_dataframe_from_scme(scme: "StreamCostModelEvaluation", layer_ids: list[i
         tensors = get_real_input_tensors(node, scme.workload)
         task_type = "compute"
         d = dict(
-            Task=node.short_name,
+            Task=node.name,
+            # Task=node.short_name,
             Id=str(int(node.id)),
             Sub_id=str(int(node.sub_id)),
             Start=start,

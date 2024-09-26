@@ -17,10 +17,11 @@ class ElementwiseParser(OnnxOperatorParser):
 
     def generate_elementwise_node(self):
         predecessors = self.get_node_predecessors()
-        assert 0 < len(predecessors) <= 2, f"An ONNX Elementwise node of type {self.type} with {len(predecessors)} input nodes is not supported"
-        input_names = self.node.input[:len(predecessors)]
+        assert (
+            0 < len(predecessors) <= 2
+        ), f"An ONNX Elementwise node of type {self.type} with {len(predecessors)} input nodes is not supported"
+        input_names = self.node.input[: len(predecessors)]
         output_names = [self.node.output[0]]
-
 
         node_obj = ElementwiseNode(
             node_id=self.node_id,

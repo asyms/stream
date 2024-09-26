@@ -23,7 +23,7 @@ class LpNormalizationParser(OnnxOperatorParser):
         return LpNormalizationNode(
             node_id=self.node_id,
             node_name=self.node.name,
-            predecessor=predecessor, 
+            predecessor=predecessor,
             input_names=input_names,
-            output_names=output_names
+            output_names=output_names,
         )

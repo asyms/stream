@@ -29,12 +29,19 @@ class CommunicationEvent:
         self.start = tasks[0].start
         self.end = tasks[0].end
         self.energy = sum([t.energy for t in tasks])
+        self.memory_energy = 0
 
     def __str__(self) -> str:
         return f"CommunicationEvent(id={self.id})"
 
     def __repr__(self) -> str:
         return str(self)
+
+    def set_memory_energy(self, memory_energy: int):
+        self.memory_energy = memory_energy
+
+    def get_memory_energy(self) -> int:
+        return self.memory_energy
 
 
 class CommunicationLinkEvent:
@@ -182,6 +189,7 @@ class CommunicationManager:
         memory_energy_cost = self.accelerator.get_memory_energy_cost_of_transfer(
             tensor, sender, receiver, sender_memory_operand, receiver_memory_operand
         )
+        event.set_memory_energy(memory_energy_cost)
         return link_energy_cost, memory_energy_cost
 
     def block_offchip_links(
