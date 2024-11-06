@@ -13,7 +13,7 @@ _logging.basicConfig(level=_logging_level, format=_logging_format)
 
 ############################################INPUTS############################################
 accelerator = "stream/inputs/eenn/hardware/edge_tpu_like_quad_core.yaml"
-workload_path = "stream/inputs/eenn/workload/conv-only.onnx"
+workload_path = "stream/inputs/eenn/workload/model-latest.onnx"
 mapping_path = "stream/inputs/eenn/mapping/edge_tpu_like_quad_core.yaml"
 mode = "lbl"
 nb_ga_generations = 16

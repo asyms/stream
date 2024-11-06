@@ -74,7 +74,10 @@ class LayerStacksGenerationStage(Stage):
         for stack in self.layer_stacks:
             update_stack = []
             for layer_id in stack:
-                n = next(n for n in self.workload.node_list if n.id == layer_id)
+                try:
+                    n = next(n for n in self.workload.node_list if n.id == layer_id)
+                except StopIteration:
+                    continue
                 if isinstance(n, ComputationNode):
                     update_stack.append(layer_id)
             if update_stack:

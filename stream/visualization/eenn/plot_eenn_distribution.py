@@ -10,7 +10,7 @@ from zigzag.utils import pickle_load
 pio.kaleido.scope.mathjax = None
 
 # Global variables
-FIG_PATH = "outputs-eenn/distribution_cum_energy.pdf"
+FIG_PATH = "outputs-eenn/distribution_cum_energy_new.pdf"
 DATA_PATH = "outputs-eenn/eenn_data.pickle"
 
 
@@ -26,6 +26,7 @@ def style_legend(fig):
             bordercolor="Black",
             borderwidth=2,
             font=dict(family="Arial", size=16, color="black"),
+            orientation="h",
         )
     )
 
@@ -54,6 +55,7 @@ def style_profesionally(fig, df):
         showgrid=True,
         gridcolor="lightgrey",
         gridwidth=0.5,
+        mirror=True,
         # tickformat='.1e',
         # showexponent = 'last',
         # exponentformat = 'e',
@@ -80,12 +82,12 @@ def style_profesionally(fig, df):
     fig.update_yaxes(matches="y2", row=1, col=2, secondary_y=True)  # Second subplot (doesn't seem to work)
 
     # Get the minimum and maximum across all relevant y-axes
-    min_value_y2 = min(df["cum_energy_fraction"].min(), df["cum_macs_fraction"].min())
-    max_value_y2 = max(df["cum_energy_fraction"].max(), df["cum_macs_fraction"].max())
+    min_value_y = min(df["cum_latency_fraction"].min(), df["cum_energy_fraction"].min(), df["cum_macs_fraction"].min())
+    max_value_y = max(df["cum_latency_fraction"].max(), df["cum_energy_fraction"].max(), df["cum_macs_fraction"].max())
 
-    # Ensure both left and right axes have the same range for subplot 2
-    fig.update_yaxes(range=[min_value_y2 * 0.9, max_value_y2 * 1.1], row=1, col=2, secondary_y=False)
-    fig.update_yaxes(range=[min_value_y2 * 0.9, max_value_y2 * 1.1], row=1, col=2, secondary_y=True)
+    # Ensure both left and right axes have the same range for subplot 1 and 2
+    fig.update_yaxes(range=[min_value_y * 0.9, max_value_y * 1.1], row=1, col=1, secondary_y=False)
+    fig.update_yaxes(range=[min_value_y * 0.9, max_value_y * 1.1], row=1, col=2, secondary_y=False)
 
     style_legend(fig)
 
@@ -98,54 +100,54 @@ def save_plot():
     df = pd.DataFrame(data)
 
     # Create subplots: 1 row, 2 columns
-    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.2, specs=[[{"secondary_y": True}, {"secondary_y": True}]])
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        horizontal_spacing=0.2,
+    )
 
     # Cumulative latency fraction plot
-    latency_fig = px.box(df, x="stage_id", y="cum_latency_fraction", points="all")
+    latency_fig = px.box(df, x="stage_id", y="cum_latency_fraction")
 
     # Energy distribution plot with energy fraction
-    energy_fig = px.box(df, x="stage_id", y="cum_energy_fraction", points="all")
-
-    # Scatter line plot with dashes for cum_macs_fraction on secondary y-axis (subplot 1)  .
-    df_unique = df.drop_duplicates(subset=["stage_id", "cum_macs_fraction"])
-    fig.add_trace(
-        go.Scatter(
-            x=df_unique["stage_id"],
-            y=df_unique["cum_macs_fraction"],
-            mode="lines+markers",  # Adds markers to the line plot
-            line=dict(dash="dash", color="black"),  # Line color set to black
-            marker=dict(size=8, color="black"),  # Marker size and color
-            name="Fraction of MACs Completed",
-            showlegend=True,  # Show legend for this trace
-        ),
-        row=1,
-        col=1,
-        secondary_y=True,
-    )
-
-    # For the second subplot, hide the legend entry
-    fig.add_trace(
-        go.Scatter(
-            x=df_unique["stage_id"],
-            y=df_unique["cum_macs_fraction"],
-            mode="lines+markers",  # Adds markers to the line plot
-            line=dict(dash="dash", color="black"),  # Line color set to black
-            marker=dict(size=8, color="black"),  # Marker size and color
-            name="Cumulative MACs Fraction",
-            showlegend=False,  # Hide legend for this trace
-        ),
-        row=1,
-        col=2,
-        secondary_y=True,
-    )
+    energy_fig = px.box(df, x="stage_id", y="cum_energy_fraction")
 
     # Add latency plot traces to the first subplot
-    for trace in latency_fig.data:
+    for i, trace in enumerate(latency_fig.data):
+        if i == 0:  # Have one legend entry that specifies the meaning of the box plot
+            trace.showlegend = True
+            trace.name = "Latency/Energy Distribution"
         fig.add_trace(trace, row=1, col=1)
 
     # Add energy plot traces to the second subplot
     for trace in energy_fig.data:
         fig.add_trace(trace, row=1, col=2)
+
+    # Scatter line plot with dashes for cum_macs_fraction on both subplots
+    df_unique = df.drop_duplicates(subset=["stage_id", "cum_macs_fraction"])
+    macs_trace = go.Scatter(
+        x=df_unique["stage_id"],
+        y=df_unique["cum_macs_fraction"],
+        mode="lines+markers",  # Adds markers to the line plot
+        line=dict(dash="dash", color="black"),  # Line color set to black
+        marker=dict(size=8, color="black"),  # Marker size and color
+        name="Fraction of MACs Completed",
+        showlegend=True,  # Show legend for this trace
+    )
+    fig.add_trace(
+        macs_trace,
+        row=1,
+        col=1,
+        secondary_y=False,
+    )
+    # For the second subplot, hide the legend entry
+    macs_trace.showlegend = False
+    fig.add_trace(
+        macs_trace,
+        row=1,
+        col=2,
+        secondary_y=False,
+    )
 
     style_profesionally(fig, df)
 
