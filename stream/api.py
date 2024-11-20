@@ -60,14 +60,21 @@ def optimize_allocation_ga(
     experiment_id: str,
     output_path: str,
     skip_if_exists: bool = False,
+    model_id: list[int] = None,
+    precision_backbone: int = 8,
+    precision_classifier: int = 8,
+    model_path: str = None,
 ):
     _sanity_check_inputs(hardware, workload, mapping, mode, output_path)
 
     logger = _logging.getLogger(__name__)
 
+    # Make path
+    os.makedirs(f"{output_path}/{experiment_id}", exist_ok=True)
+
     # Output paths
-    node_hw_performances_path = f"{output_path}/{experiment_id}-saved_cn_hw_cost.pickle"
-    scme_path = f"{output_path}/{experiment_id}-scme.pickle"
+    node_hw_performances_path = f"{output_path}/{experiment_id}/saved_cn_hw_cost.pickle"
+    scme_path = f"{output_path}/{experiment_id}/scme.pickle"
 
     if os.path.exists(scme_path) and skip_if_exists:
         scme = pickle_load(scme_path)
@@ -95,6 +102,10 @@ def optimize_allocation_ga(
             layer_stacks=layer_stacks,
             node_hw_performances_path=node_hw_performances_path,
             operands_to_prefetch=[],  # required by GeneticAlgorithmAllocationStage
+            model_id=model_id,  # required by GeneticAlgorithmAllocationStage
+            precision_backbone=precision_backbone,  # required by ONNXModelParserStage
+            precision_classifier=precision_classifier,  # required by ONNXModelParserStage
+            model_path=model_path,  # required by GeneticAlgorithmAllocationStage
         )
         # Launch the MainStage
         answers = mainstage.run()
@@ -117,10 +128,10 @@ def optimize_allocation_co(
     _sanity_check_gurobi_license()
 
     # Output paths
-    node_hw_performances_path = f"{output_path}/{experiment_id}-saved_cn_hw_cost.pickle"
-    scme_path = f"{output_path}/{experiment_id}-scme.pickle"
+    node_hw_performances_path = f"{output_path}/{experiment_id}/saved_cn_hw_cost.pickle"
+    scme_path = f"{output_path}/{experiment_id}/scme.pickle"
     # After constraint optimization paths
-    node_hw_performances_path_with_split = f"outputs/{experiment_id}-saved_cn_hw_cost-with_split.pickle"
+    node_hw_performances_path_with_split = f"outputs/{experiment_id}/saved_cn_hw_cost-with_split.pickle"
 
     logger = _logging.getLogger(__name__)
 

@@ -153,3 +153,7 @@ docs/make.bat
 
 # html files
 *.html
+
+*.pickle
+*.json
+*.pdf

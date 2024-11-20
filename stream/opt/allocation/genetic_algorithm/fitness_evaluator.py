@@ -8,10 +8,23 @@ from stream.utils import CostModelEvaluationLUT, get_too_large_operands
 from stream.workload.computation_node import ComputationNode
 from stream.workload.onnx_workload import ComputationNodeWorkload
 
-EENN_BLOCK_IDS = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (9, 10, 11)]
-EENN_CLASSIFIER_IDS = [(0,), (1,), (2,), (3,)]
-STAGE_IDS = [0, 1, 2, 3]
-DATA_PATH = "outputs-eenn/eenn_data.pickle"
+# MODEL_ID = 7
+# if MODEL_ID == -1:  # old experiment with model_latest.onnx
+#     EENN_BLOCK_IDS = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (9, 10, 11)]
+# elif MODEL_ID == 4:   # for 0 2 4 model
+#     EENN_BLOCK_IDS = [(0,), (1, 2), (3, 4), (5, 6, 7, 8, 9, 10, 11)]
+# elif MODEL_ID == 5:   # for 0 2 5 model
+#     EENN_BLOCK_IDS = [(0,), (1, 2), (3, 4, 5), (6, 7, 8, 9, 10, 11)]
+# elif MODEL_ID == 6:   # for 0 2 6 model
+#     EENN_BLOCK_IDS = [(0,), (1, 2), (3, 4, 5, 6), (7, 8, 9, 10, 11)]
+# elif MODEL_ID == 7:   # for 0 2 7 model
+#     EENN_BLOCK_IDS = [(0,), (1, 2), (3, 4, 5, 6, 7), (8, 9, 10, 11)]
+
+
+# if MODEL_ID == -1:
+#     DATA_PATH = "outputs-eenn/mounting_points_data/model_latest.pickle"
+# else:
+#     DATA_PATH = f"outputs-eenn/mounting_points_data/model_0_2_{MODEL_ID}.pickle"
 
 
 class FitnessEvaluator:
@@ -41,6 +54,10 @@ class StandardFitnessEvaluator(FitnessEvaluator):
         layer_groups_flexible,
         operands_to_prefetch: list[LayerOperand],
         scheduling_order: list[tuple[int, int]],
+        model_id: list[int],
+        precision_backbone: int,
+        precision_classifier: int,
+        model_path: str,
     ) -> None:
         super().__init__(workload, accelerator, node_hw_performances)
 
@@ -51,6 +68,18 @@ class StandardFitnessEvaluator(FitnessEvaluator):
         self.operands_to_prefetch = operands_to_prefetch
         self.scheduling_order = scheduling_order
 
+        # Added to save different allocations data
+        self.model_id = model_id
+        self.stage_ids = list(range(len(model_id)))
+        self.classifier_ids = list((i,) for i in range(len(model_id)))
+
+        self.eenn_block_ids = []
+        start = 0
+        for end in self.model_id:
+            self.eenn_block_ids.append(tuple(range(start, end + 1)))
+            start = end + 1
+        model_id_str = "_".join(map(str, self.model_id))
+        self.data_save_path = f"{model_path}/model_{model_id_str}.pickle"
         self.data = []
 
     def get_fitness(self, core_allocations: list[int], return_scme: bool = False):
@@ -83,9 +112,9 @@ class StandardFitnessEvaluator(FitnessEvaluator):
         all_block_ends = {}
         all_classifier_starts = {}
         all_classifier_ends = {}
-        for stage_id in STAGE_IDS:
-            block_ids = EENN_BLOCK_IDS[stage_id]
-            classifier_ids = EENN_CLASSIFIER_IDS[stage_id]
+        for stage_id in self.stage_ids:
+            block_ids = self.eenn_block_ids[stage_id]
+            classifier_ids = self.classifier_ids[stage_id]
             block_nodes = []
             block_patterns = {f"blocks.{x}/" for x in block_ids}
             classifier_patterns = {f"classifiers.{x}/" for x in classifier_ids}
@@ -110,7 +139,7 @@ class StandardFitnessEvaluator(FitnessEvaluator):
         cum_energy = 0
         cum_macs = 0
         total_macs = sum((n.total_mac_count for n in scme.workload.node_list))
-        for stage_id in STAGE_IDS:
+        for stage_id in self.stage_ids:
             stage_start = all_block_starts[stage_id]
             stage_end = all_classifier_ends[stage_id]
             block_latency = all_block_ends[stage_id] - all_block_starts[stage_id]
@@ -128,7 +157,7 @@ class StandardFitnessEvaluator(FitnessEvaluator):
                 if event.tasks[0].tensors[0].origin in all_block_nodes[stage_id] + all_classifier_nodes[stage_id]:
                     comm_energy += event.energy + event.memory_energy
             cum_energy += comm_energy
-            if stage_id != STAGE_IDS[-1]:
+            if stage_id != self.stage_ids[-1]:
                 next_block_nodes = all_block_nodes[stage_id + 1]
                 overlapping_next_block_nodes = [n for n in next_block_nodes if n.start < all_classifier_ends[stage_id]]
                 energy_overhead = sum((n.onchip_energy + n.offchip_energy for n in overlapping_next_block_nodes))
@@ -144,6 +173,7 @@ class StandardFitnessEvaluator(FitnessEvaluator):
                 "latency": latency,
                 "cn_energy": cn_energy,
                 "comm_energy": comm_energy,
+                "energy": cn_energy + comm_energy,
                 "energy_overhead": energy_overhead,
                 "cum_latency_fraction": all_classifier_ends[stage_id] / scme.latency,
                 "energy_fraction": (cn_energy + comm_energy) / scme.energy,
@@ -153,7 +183,7 @@ class StandardFitnessEvaluator(FitnessEvaluator):
             self.data.append(stage_data)
 
     def write_eenn_data(self):
-        pickle_save(self.data, DATA_PATH)
+        pickle_save(self.data, self.data_save_path)
 
     def set_node_core_allocations(self, core_allocations: list[int]):
         """Sets the core allocation of all nodes in self.workload according to core_allocations.

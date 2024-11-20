@@ -39,6 +39,10 @@ class GeneticAlgorithmAllocationStage(Stage):
         nb_ga_individuals: int,
         operands_to_prefetch: list[LayerOperand],
         scheduling_order: list[tuple[int, int]],
+        model_id: list[int],
+        precision_backbone: int,
+        precision_classifier: int,
+        model_path: str,
         **kwargs: Any,
     ):
         """Initialize the InterCoreMappingStage.
@@ -97,6 +101,10 @@ class GeneticAlgorithmAllocationStage(Stage):
             self.layer_groups_flexible,
             self.operands_to_prefetch,
             self.scheduling_order,
+            model_id,
+            precision_backbone,
+            precision_classifier,
+            model_path,
         )
 
         # Extract the length of an individual.
@@ -108,6 +116,9 @@ class GeneticAlgorithmAllocationStage(Stage):
         core_ids: list[int] = sorted([core.id for core in self.accelerator.cores.node_list])
         self.core_id_range = (min(core_ids), max(core_ids))
         self.nb_cores = max(core_ids) - min(core_ids) + 1  # Assuming they are incrementing with step size 1
+
+        # Add model id to save different allocations performance
+        self.model_id = model_id
 
     def run(self):
         """Run the InterCoreMappingStage by checking if we have a fixed core_allocation.

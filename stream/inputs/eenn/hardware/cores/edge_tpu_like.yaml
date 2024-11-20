@@ -1,10 +1,10 @@
 name: edge_tpu_like
 
 memories:
-  rf_1B:
-    size: 8
-    r_bw: 8
-    w_bw: 8
+  rf_W:
+    size: 32
+    r_bw: 32
+    w_bw: 32
     r_cost: 0.01
     w_cost: 0.01
     area: 0
@@ -19,10 +19,10 @@ memories:
         tl: r_port_1
     served_dimensions: [D3, D4]
 
-  rf_2B:
-    size: 16
-    r_bw: 16
-    w_bw: 16
+  rf_O:
+    size: 32
+    r_bw: 32
+    w_bw: 32
     r_cost: 0.02
     w_cost: 0.02
     area: 0
