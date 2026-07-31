@@ -1,3 +1,5 @@
+import os
+
 from zigzag.datatypes import LayerOperand
 from zigzag.mapping.data_movement import MemoryAccesses
 from zigzag.utils import pickle_deepcopy, pickle_save
@@ -79,6 +81,11 @@ class StandardFitnessEvaluator(FitnessEvaluator):
             self.eenn_block_ids.append(tuple(range(start, end + 1)))
             start = end + 1
         model_id_str = "_".join(map(str, self.model_id))
+        if model_path is None:
+            raise ValueError(
+                "model_path is required: the per-stage EENN data (the input of every plot script) is written to "
+                "'<model_path>/model_<ids>.pickle'. Pass model_path=... to optimize_allocation_ga()."
+            )
         self.data_save_path = f"{model_path}/model_{model_id_str}.pickle"
         self.data = []
 
@@ -98,8 +105,13 @@ class StandardFitnessEvaluator(FitnessEvaluator):
         scme.run()
         energy = scme.energy
         latency = scme.latency
+        # Always record this allocation. On the return_scme path this is what makes a
+        # single-compute-core accelerator work at all: there is no flexible allocation to
+        # search, so the GA is skipped and this is the only evaluation that ever happens.
+        # For a multi-core run the best allocation was already evaluated during the search,
+        # so recording it again does not change the per-stage minimum the plots take.
+        self.save_eenn_data(scme)
         if not return_scme:
-            self.save_eenn_data(scme)
             return energy, latency
         self.write_eenn_data()
         return energy, latency, scme
@@ -183,6 +195,7 @@ class StandardFitnessEvaluator(FitnessEvaluator):
             self.data.append(stage_data)
 
     def write_eenn_data(self):
+        os.makedirs(os.path.dirname(self.data_save_path), exist_ok=True)
         pickle_save(self.data, self.data_save_path)
 
     def set_node_core_allocations(self, core_allocations: list[int]):

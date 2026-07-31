@@ -108,6 +108,15 @@ class ZigZagCoreMappingEstimationStage(Stage):
                     # If so, we update the core
                     too_large_operands_for_cme = self.check_core_capacity_for_node(core, node_duplicate)
                     node_duplicate.set_chosen_core_allocation(core_id)
+                    # zigzag's SpatialMappingGeneratorStage resolves the core with
+                    # `core_id = layer.core_allocation[0]`, and it never looks at
+                    # chosen_core_allocation. Without this line core_allocation is still the
+                    # mapping's full candidate list ([0, 1, 2, 3]), so every (node, core) pair is
+                    # silently evaluated on core 0's hardware. That is invisible on a homogeneous
+                    # accelerator but makes every core of a heterogeneous one report the core-0
+                    # cost. The reuse branch above already fixes core_allocation up for the same
+                    # reason.
+                    node_duplicate.set_core_allocation(core_id)
                     # Set the node's spatial mapping to the possible spatial mappings of the current core
                     node_duplicate.spatial_mapping = (
                         core.dataflows if core.dataflows is not None else SpatialMapping.empty()

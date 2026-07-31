@@ -1,0 +1,55 @@
+# pooling_fig8: copied verbatim from stream/inputs/examples/hardware/cores/pooling.yaml.
+#
+# This is the core that Figure 8 was actually run with, and it is pinned here by an explicit
+# path on purpose. The paper's edge_tpu_like_quad_core.yaml lists its cores by bare filename,
+# which makes the validator walk stream/inputs/ and take the first match. Commit ae06c7f
+# renamed operational_array: to multipliers: in stream/inputs/eenn/hardware/cores/pooling.yaml,
+# which zigzag-dse 3.6.3 rejects, so on the machine that produced the figures the walk fell
+# through to this examples copy. Which one wins depends on filesystem order, so the same repo
+# reproduces Figure 8 on one machine and comes out ~2.7x high on another.
+#
+# Measured, isolating one core at a time on Pareto model iter_0/net_8 at 64x64:
+#   eenn pooling (3x3 = 9 units)      -> ET 1013
+#   this pooling (3x3x8 = 72 units)   -> ET  375   <- Figure 8 band is ~380..560
+#   eenn vs examples simd/offchip     -> 1013 vs 1015, i.e. no effect
+# Pooling is roughly half the busy cycles on these workloads, which is the whole gap.
+name: pooling
+
+memories:
+  sram_128KB:
+    size: 1048576
+    r_bw: 576  # 9 inputs * 8 channels * 8 bits
+    w_bw: 512
+    r_cost: 60
+    w_cost: 75
+    area: 0
+    r_port: 1
+    w_port: 1
+    rw_port: 0
+    latency: 1
+    operands: [I1, I2, O]
+    ports:
+      - fh: w_port_1
+        tl: r_port_1
+      - fh: w_port_1
+        tl: r_port_1
+      - fh: w_port_1
+        tl: r_port_1
+        fl: w_port_1
+        th: r_port_1
+    served_dimensions: [D1, D2, D3]
+
+
+operational_array:
+  multiplier_energy: 0.1 # pJ
+  multiplier_area: 0.01 # unit
+  dimensions: [D1, D2, D3]
+  sizes: [3, 3, 8]
+
+dataflows:
+  D1: 
+    - FX, 3
+  D2: 
+    - FY, 3
+  D3:
+    - K, 8

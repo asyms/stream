@@ -1,0 +1,177 @@
+# eyeriss_like: Eyeriss-style *wiring* at this study's budget, not Eyeriss as published.
+#
+# The published core (stream/inputs/examples/hardware/cores/eyeriss_like.yaml) is 14x12 = 168
+# MAC, 1.09 MiB and 0.5 pJ per MAC, which is a different size and a different technology node
+# from the anchor. Comparing it directly would measure those, not the architecture. What is kept
+# is the thing that actually defines the style: every register file is private to a single
+# multiplier (served_dimensions: []), so there is no spatial reuse out of the RF and each MAC
+# pays its own read, compensated with large per-PE buffers and a dedicated output SRAM level.
+#
+# What was changed, and how each number was derived:
+#   array   35x30 = 1050 MAC. The published 14x12 aspect ratio is 7:6 and 35x30 is the closest
+#           multiple of that ratio to the anchor's 1024 MAC (+2.5%).
+#   MAC     0.04 pJ, matching edge_tpu_like and meta_like (published value 0.5 pJ is a different
+#           technology assumption and would swamp every architectural effect).
+#   RF      sizes unchanged at 64 B / 64 B / 16 B per PE. Energy from the meta-calibrated
+#           relation cost = 3.711e-4 * bandwidth * sqrt(size_bits), which reproduces meta's own
+#           rf_1B (model 0.008 vs actual 0.01) and rf_2B (model 0.024 vs actual 0.02).
+#   SRAM    capacities chosen so total on-chip = 17,036,544 bit = 2.0309 MiB, within 0.05% of the
+#           anchor's 2.0320 MiB, keeping the published three-level split (output / weight / main).
+#           Energies scaled from the nearest reference level in the anchor or meta by sqrt(size):
+#             sram_main from edge_tpu_like sram_2MB   -> 388.85 / 353.57
+#             sram_W    from meta_like     sram_64KB  ->  37.56 /  43.56
+#             sram_O    from edge_tpu_like sram_32KB  ->  16.19 /  36.78
+#   DRAM    in-core DRAM identical to the anchor's, so it is not penalised by having to reach
+#           off-chip over the NoC instead.
+#   No `dataflows` block: the published one declares K,16 / C,16 which does not even fit the
+#   published 14x12 array. The anchor and meta_like both leave the spatial mapping to the
+#   mapper, so this one does too and all three are searched on equal terms.
+name: eyeriss_like
+
+memories:
+  rf_64B_A:
+    size: 512
+    r_bw: 8
+    w_bw: 8
+    r_cost: 0.0672
+    w_cost: 0.0672
+    area: 0
+    r_port: 1
+    w_port: 1
+    rw_port: 0
+    latency: 1
+    operands: [I1]
+    ports:
+      - fh: w_port_1
+        tl: r_port_1
+    served_dimensions: [] # private to one multiplier
+
+  rf_64B_W:
+    size: 512
+    r_bw: 8
+    w_bw: 8
+    r_cost: 0.0672
+    w_cost: 0.0672
+    area: 0
+    r_port: 1
+    w_port: 1
+    rw_port: 0
+    latency: 1
+    auto_cost_extraction: False
+    operands: [I2]
+    ports:
+      - fh: w_port_1
+        tl: r_port_1
+    served_dimensions: [] # private to one multiplier
+
+  rf_16B:
+    size: 128
+    r_bw: 24
+    w_bw: 24
+    r_cost: 0.1008
+    w_cost: 0.1008
+    area: 0
+    r_port: 2
+    w_port: 2
+    rw_port: 0
+    latency: 1
+    operands: [O]
+    ports:
+      - fh: w_port_1
+        tl: r_port_1
+        fl: w_port_2
+        th: r_port_2
+    served_dimensions: [] # private to one multiplier
+
+  sram_16KB_O:
+    size: 131072
+    r_bw: 512
+    w_bw: 512
+    r_cost: 16.19
+    w_cost: 36.78
+    area: 0
+    r_port: 2
+    w_port: 2
+    rw_port: 0
+    latency: 1
+    min_r_granularity: 64
+    min_w_granularity: 64
+    operands: [O]
+    ports:
+      - fh: w_port_1
+        tl: r_port_1
+        fl: w_port_2
+        th: r_port_2
+    served_dimensions: [D1, D2]
+
+  sram_128KB_W:
+    size: 1048576
+    r_bw: 512
+    w_bw: 512
+    r_cost: 37.56
+    w_cost: 43.56
+    area: 0
+    r_port: 1
+    w_port: 1
+    rw_port: 0
+    latency: 1
+    min_r_granularity: 64
+    min_w_granularity: 64
+    operands: [I2]
+    ports:
+      - fh: w_port_1
+        tl: r_port_1
+    served_dimensions: [D1, D2]
+
+  sram_main:
+    size: 14647296
+    r_bw: 2048
+    w_bw: 2048
+    r_cost: 388.85
+    w_cost: 353.57
+    area: 0
+    r_port: 1
+    w_port: 1
+    rw_port: 0
+    latency: 1
+    min_r_granularity: 64
+    min_w_granularity: 64
+    operands: [I1, O]
+    ports:
+      - fh: w_port_1
+        tl: r_port_1
+      - fh: w_port_1
+        tl: r_port_1
+        fl: w_port_1
+        th: r_port_1
+    served_dimensions: [D1, D2]
+
+  dram:
+    size: 10000000000
+    r_bw: 64
+    w_bw: 64
+    r_cost: 700
+    w_cost: 750
+    area: 0
+    r_port: 0
+    w_port: 0
+    rw_port: 1
+    latency: 1
+    operands: [I1, I2, O]
+    ports:
+      - fh: rw_port_1
+        tl: rw_port_1
+      - fh: rw_port_1
+        tl: rw_port_1
+      - fh: rw_port_1
+        tl: rw_port_1
+        fl: rw_port_1
+        th: rw_port_1
+    served_dimensions: [D1, D2]
+
+operational_array:
+  input_precision: [8, 8]
+  multiplier_energy: 0.04 # pJ
+  multiplier_area: 1 # unit
+  dimensions: [D1, D2]
+  sizes: [35, 30]

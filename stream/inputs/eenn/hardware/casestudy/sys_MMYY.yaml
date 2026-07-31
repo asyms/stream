@@ -1,0 +1,26 @@
+# sys_MMYY: The third pair, with no anchor core present.
+# Compute cores by id: 0=meta_like, 1=meta_like, 2=eyeriss_like, 3=eyeriss_like
+# Every system has 4 compute cores plus the paper's pooling, SIMD and off-chip cores,
+# on the same 2x2 mesh at 32 bit/cycle, and uses mapping/edge_tpu_like_quad_core.yaml.
+# Core paths are explicit: a bare filename makes the validator walk stream/inputs and
+# take the first match, and several core basenames exist in more than one folder.
+name: sys_MMYY
+cores:
+  # index corresponds to core ID
+  - stream/inputs/eenn/hardware/casestudy/cores/meta_like.yaml
+  - stream/inputs/eenn/hardware/casestudy/cores/meta_like.yaml
+  - stream/inputs/eenn/hardware/casestudy/cores/eyeriss_like.yaml
+  - stream/inputs/eenn/hardware/casestudy/cores/eyeriss_like.yaml
+  - stream/inputs/eenn/hardware/casestudy/cores/pooling_fig8.yaml
+  - stream/inputs/eenn/hardware/casestudy/cores/simd_fig8.yaml
+  - stream/inputs/eenn/hardware/casestudy/cores/offchip_fig8.yaml
+
+graph:
+  type: 2d_mesh
+  nb_rows: 2
+  nb_cols: 2
+  bandwidth: 32
+  unit_energy_cost: 0
+  pooling_core_id: 4
+  simd_core_id: 5
+  offchip_core_id: 6

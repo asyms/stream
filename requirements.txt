@@ -4,7 +4,9 @@ deap
 matplotlib
 brokenaxes
 plotly
+kaleido==0.2.1  # static pdf export in the visualization scripts; kaleido>=1 needs a Chrome install
 pandas
+onnx
 cerberus
 pre-commit
 gurobipy

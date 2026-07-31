@@ -164,12 +164,23 @@ class CostModelEvaluationLUT:
         else:
             return None
 
+    @staticmethod
+    def cores_have_same_performance(a: Core, b: Core) -> bool:
+        """Whether two cores are interchangeable for cost-model purposes.
+
+        zigzag's `Core.has_same_performance` only compares the operational array and the
+        memory hierarchy, so two cores that differ *only* in their dataflow are reported as
+        identical. That is wrong for a heterogeneous accelerator: reusing one core's cached
+        CostModelEvaluation for the other silently evaluates the whole workload with a single
+        dataflow and makes the heterogeneity disappear. The spatial unrolling is part of the
+        performance, so compare it too.
+        """
+        return a.has_same_performance(b) and a.dataflows == b.dataflows
+
     def get_equal_core(self, node: "ComputationNode", core: Core):
         """Retrieve the core in the look-up table that is equal to the given core."""
-        if node and any((c.has_same_performance(core) for c in self.lut.get(node, {}))):
-            return next(c for c in self.lut[node] if c.has_same_performance(core))
-        else:
-            return None
+        candidates = self.lut.get(node, {}) if node else {}
+        return next((c for c in candidates if self.cores_have_same_performance(c, core)), None)
 
     def get_nodes(self):
         return list(self.lut.keys())

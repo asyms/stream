@@ -1,0 +1,46 @@
+# offchip_fig8: copied verbatim from stream/inputs/examples/hardware/cores/offchip.yaml.
+#
+# This is the core that Figure 8 was actually run with, and it is pinned here by an explicit
+# path on purpose. The paper's edge_tpu_like_quad_core.yaml lists its cores by bare filename,
+# which makes the validator walk stream/inputs/ and take the first match. Commit ae06c7f
+# renamed operational_array: to multipliers: in stream/inputs/eenn/hardware/cores/offchip.yaml,
+# which zigzag-dse 3.6.3 rejects, so on the machine that produced the figures the walk fell
+# through to this examples copy. Which one wins depends on filesystem order, so the same repo
+# reproduces Figure 8 on one machine and comes out ~2.7x high on another.
+#
+# Measured, isolating one core at a time on Pareto model iter_0/net_8 at 64x64:
+#   eenn pooling (3x3 = 9 units)      -> ET 1013
+#   this pooling (3x3x8 = 72 units)   -> ET  375   <- Figure 8 band is ~380..560
+#   eenn vs examples simd/offchip     -> 1013 vs 1015, i.e. no effect
+# Pooling is roughly half the busy cycles on these workloads, which is the whole gap.
+name: offchip
+
+memories:
+  dram:
+    size: 10000000000
+    r_bw: 64
+    w_bw: 64
+    r_cost: 1000
+    w_cost: 1000
+    area: 0
+    r_port: 0
+    w_port: 0
+    rw_port: 1
+    latency: 1
+    operands: [I1, I2, O]
+    ports:
+      - fh: rw_port_1
+        tl: rw_port_1
+      - fh: rw_port_1
+        tl: rw_port_1
+      - fh: rw_port_1
+        tl: rw_port_1
+        fl: rw_port_1
+        th: rw_port_1
+    served_dimensions: [D1, D2]
+
+operational_array:
+  multiplier_energy: 0
+  multiplier_area: 0
+  dimensions: [D1, D2]
+  sizes: [0, 0]
